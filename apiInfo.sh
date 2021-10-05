@@ -8,7 +8,7 @@ apiIds=$(jq '.items | .[] | .id' apis.json)
 apiNames=$(jq '.items | .[] | .name' apis.json)
 
 apiIds=$(echo "$apiIds" | tr -d '"' | tr '\n' ' ')
-apiNames=$(echo "$apiNames" | tr -d '"' | tr '\n' ' ')
+apiNames=$(echo "$apiNames" | tr -d '"' | tr ' ' '_' |tr '\n' ' ')
 
 declare -a idis=($apiIds)
 declare -a names=($apiNames)
