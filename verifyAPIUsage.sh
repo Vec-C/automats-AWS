@@ -69,7 +69,7 @@ do
 			SVAR=$(jq .uri <<< $RESOURCE)
 			if [ ! -z $(grep -o 'stageVariables' <<< $SVAR) ]
 			then
-				SVAR=$(ggrep -Po '(?<=\.)[a-zA-Z]+(?=})' <<< $SVAR )
+				SVAR=$(ggrep -Po '(?<=\.)[a-zA-Z0-9]+(?=})' <<< $SVAR )
 				jq .variables.$SVAR <<< $STAGE
 				ELB=$(jq .variables.$SVAR <<< $STAGE | ggrep -Po '(?<=")[a-zA-Z]+(?=-)')
 				PORT=$(jq .variables.$SVAR <<< $STAGE | ggrep -Po '(?<=:)\d+')
