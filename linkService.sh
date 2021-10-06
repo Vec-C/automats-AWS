@@ -98,6 +98,8 @@ if [ $DOIT == "yes" ]
 		declare -a PARENTS
 		declare -a CHILDS
 		count=0
+		PARENTS[$count]="qwerty "$PARENT
+		count=$((count+1))
 
 		for i in ${!CREATER[@]}
 		do
@@ -109,30 +111,30 @@ if [ $DOIT == "yes" ]
 			do
 
 				IFS=" "
-				if [ $countI == 0 ]
-					then
-						if [[ ! " ${PARENTS[*]} " =~ " $j " ]]; then
-							echo "Create resource parent: "$j
-							PARENTS[$count]=$j 
-							countI=$((countI+1))
-							count=$((count+1))
-						fi
-					else
-						CHILDS[$countI]=$j
-						countI=$((countI+1))
-				fi
-				
-			done
-			
-			for j in ${CHILDS[@]}
-			do
-				
+
 				if [[ ! " ${PARENTS[*]} " =~ " $j " ]]; then
-					echo "Creating resource "$j
+					if [ $countI == 0 ]
+					then
+						count=1
+					fi
+					echo "Create resource: "$j
+					PN=$( echo ${PARENTS[$((count-1))]} | ggrep -Po '^.*(?=\s)' )
+					echo $PN
+					PID=$( echo ${PARENTS[$((count-1))]} | ggrep -Po '(?<=\s).*$' )
+					echo $PID
+					PA=$(aws apigateway create-resource --rest-api-id $APIID --parent-id $PID --path-part $j)
+					PARENTS[$count]=$j" "$(echo $PA | jq .id | tr -d '"')
+					count=$((count+1))
+					countI=$((countI+1))
+				else
+					for key in "${!PARENTS[@]}"; do
+				   	if [[ $( echo ${PARENTS[$key]} | ggrep -Po '^.*(?=\s)' ) == "$j" ]]; then
+				      	PARENTS[$count]=${PARENTS[$key]}
+				      	count=$((count+1))
+				      	countI=$((countI+1))
+				   	fi
+					done
 				fi
-				#aws apigateway create-resource --rest-api-id $APIID --parent-id $PARENT --path-part $CREATER[$i]
-				PARENTS[$count]=$j
-				count=$((count+1))
 
 			done
 
