@@ -27,10 +27,8 @@ fi
 #****************LIST APIS***********
 aws apigateway get-rest-apis --max-items 100 > apis.json
 echo $(sed '/policy/d' apis.json) > apis.json
-
 apiIds=$(jq '.items | .[] | .id' apis.json)
 apiNames=$(jq '.items | .[] | .name' apis.json)
-
 apiIds=$(echo "$apiIds" | tr -d '"' | tr '\n' ' ')
 apiNames=$(echo "$apiNames" | tr -d '"' | tr ' ' '_' |tr '\n' ' ')
 
@@ -42,14 +40,11 @@ for key in "${!idis[@]}"; do echo ${idis[$key]}; echo ${names[$key]}; echo "\n";
 #****************RECURSOS***********
 echo "Ingresa el id del API donde desea añadir los recursos"
 read APIID
-
 RESOURCES=$(aws apigateway get-resources --rest-api-id $APIID)
-
 echo $RESOURCES | jq '.items[] | "\(.id) \(.path) \(.resourceMethods)\n"' > linkrecs.txt
 
 #***********SEEK METHODS FOR EACH RESOURCE**********
 NEWRESOURCES=$(jq -r -f list-operations.jq $SWAGGER)
-
 declare -a CREATER
 declare -a CREATEM
 IFS='
@@ -104,24 +99,26 @@ if [ $DOIT == "yes" ]
 
 			IFS='/'
 			countI=0
+			LOCALSTACK=""
 
 			#***********FOR EACH RESOURCE CHILD/VERB ( /... )**********
 			for j in ${CREATER[$i]}; do
 
 				IFS=" "
-				if [[ ! " ${PARENTS[*]} " =~ " $j " ]]; then
+				if [[ ! " ${PARENTS[*]} " =~ " $LOCALSTACK/$j " ]]; then
 					if [ $countI == 0 ]
 						then
 							count=1
 					fi
-					echo "Create resource: "$j
+					echo "Create resource: $LOCALSTACK/$j ___ Parent: "${PARENTS[$((count-1))]}
 					PID=$( echo ${PARENTS[$((count-1))]} | ggrep -Po '(?<=\s).*$' )
-					PA=$(aws apigateway create-resource --rest-api-id $APIID --parent-id $PID --path-part $j || sed -En 's/"([a-z0-9]+) \/'$j' .*/\1/p' linkrecs.txt)
+					ESCAPEDLS=$(sed -En 's/\//\\\//gp' <<< $LOCALSTACK)
+					PA=$(aws apigateway create-resource --rest-api-id $APIID --parent-id $PID --path-part $j || sed -En 's/"([a-z0-9]+) '$ESCAPEDLS'\/'$j' .*/\1/p' linkrecs.txt)
 					if [ -z "$(echo $PA | jq .id )" ] 
 					then
-						PARENTS[$count]=$j" "$PA
+						PARENTS[$count]=$LOCALSTACK/$j" "$PA
 					else
-						PARENTS[$count]=$j" "$(echo $PA | jq .id | tr -d '"')
+						PARENTS[$count]=$LOCALSTACK/$j" "$(echo $PA | jq .id | tr -d '"')
 					fi
 					count=$((count+1))
 					countI=$((countI+1))
@@ -129,13 +126,15 @@ if [ $DOIT == "yes" ]
 
 					for key in "${!PARENTS[@]}"; do
 
-				   	if [[ $( echo ${PARENTS[$key]} | ggrep -Po '^.*(?=\s)' ) == "$j" ]]; then
+				   	if [[ $( echo ${PARENTS[$key]} | ggrep -Po '^.*(?=\s)' ) == "$LOCALSTACK/$j" ]]; then
 				      	PARENTS[$count]=${PARENTS[$key]}
 				      	count=$((count+1))
 				      	countI=$((countI+1))
 				   	fi
 
 					done
+
+					LOCALSTACK=$LOCALSTACK/$j
 				
 				fi
 
@@ -148,6 +147,8 @@ if [ $DOIT == "yes" ]
 			RESOURCES=$(aws apigateway get-resources --rest-api-id $APIID)
 			echo $RESOURCES | jq '.items[] | "\(.id) \(.path) \(.resourceMethods)\n"' > linkrecs.txt
 			REC=$(if [ -z "$(sed -En 's/\//\\\//gp' <<< ${CREATER[$i]})" ] ;then echo ${CREATER[$i]} ; else sed -En 's/\//\\\//gp' <<< ${CREATER[$i]}; fi )
+			REC=$(if [ -z "$(sed -En 's/\{([a-z0-9]+)\}/\\\{\1\\\}/gp' <<< $REC)" ] ;then echo $REC ; else sed -En 's/\{([a-z0-9]+)\}/\\\{\1\\\}/gp' <<< $REC; fi )
+			echo $REC
 			RID=$( sed -En 's/"([a-z0-9]+) \/'$REC' .*/\1/p' linkrecs.txt )
 			METHOD=$( echo ${CREATEM[$i]} | tr [:lower:] [:upper:] )
 			RPARAMETERS=""
