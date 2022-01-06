@@ -4,20 +4,21 @@
 helpFunction()
 {
    echo ""
-   echo "Usage: $0 -a SWAGGER "
+   echo "Usage: $0 -swagger with file name -type with (HTTP|VPCLINK|MOCK)"
    echo "\t-a Service definition not found"
    exit 1 # Exit script after printing help
 }
 
-while getopts "a:" opt; do
+while getopts ":swagger:type:" opt; do
    case "$opt" in
-      a ) SWAGGER="$OPTARG" ;;
+      swagger ) SWAGGER="$OPTARG" ;;
+      type ) TYPE="$OPTARG" ;;
       ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
 
 # Print helpFunction in case parameters are empty
-if [ -z "$SWAGGER" ]
+if [ -z "$SWAGGER" ] || [ -z "$TYPE" ]
 then
    echo "Some or all of the parameters are empty";
    helpFunction
@@ -101,7 +102,7 @@ if [ $DOIT == "yes" ]
 			countI=0
 			LOCALSTACK=""
 
-			#***********FOR EACH RESOURCE CHILD/VERB ( /... )**********
+			#***********FOR EACH RESOURCE CHILD/VERB ( /.../... )**********
 			for j in ${CREATER[$i]}; do
 
 				IFS=" "
@@ -143,6 +144,7 @@ if [ $DOIT == "yes" ]
 			echo "Creating "${CREATEM[$i]}" method for /"${CREATER[$i]}
 			HPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="header" ) | .name ' $SWAGGER )
 			QPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="query" ) | .name ' $SWAGGER )
+			PPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="path" ) | .name ' $SWAGGER )
 			CODERESPONSES=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .responses | to_entries | .[] | .key' $SWAGGER )
 			RESOURCES=$(aws apigateway get-resources --rest-api-id $APIID)
 			echo $RESOURCES | jq '.items[] | "\(.id) \(.path) \(.resourceMethods)\n"' > linkrecs.txt
@@ -168,12 +170,39 @@ if [ $DOIT == "yes" ]
 				fi
 			done <<< $QPARAMS
 
+			while read p; do  
+				if [ ! -z $p ] ; then  
+  					RPARAMETERS=$RPARAMETERS"method.request.path.$p=false,"
+  					RIPARAMETERS=$RIPARAMETERS"integration.request.path.$p=method.request.path.$p,"
+				fi
+			done <<< $PPARAMS
+
 			if [ ! -z $RPARAMETERS ] ; then
 				aws apigateway put-method --rest-api-id $APIID --resource-id $RID --http-method $METHOD --authorization-type "NONE" --no-api-key-required --request-parameters "${RPARAMETERS%?}"
-				aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}"
+				case "$TYPE" in
+			      VPCLINK ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}" --connection-type VPC_LINK --connection-id 8onbgr
+			       ;;
+			      HTTP ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}"
+			       ;;
+			      MOCK ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type MOCK --integration-http-method $METHOD --request-templates '{ "application/json": "{\"statusCode\": 200}" }'
+			       ;;
+			   esac
 			else
 				aws apigateway put-method --rest-api-id $APIID --resource-id $RID --http-method $METHOD --authorization-type "NONE" --no-api-key-required
-				aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]}
+				case "$TYPE" in
+			      VPCLINK ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --connection-type VPC_LINK --connection-id 8onbgr
+			       ;;
+			      HTTP ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]}
+			       ;;
+			      MOCK ) 
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type MOCK --integration-http-method $METHOD --request-templates '{ "application/json": "{\"statusCode\": 200}" }'
+			       ;;
+			   esac
 			fi
 
 			#***********ADDING RESPONSE CODES**********
