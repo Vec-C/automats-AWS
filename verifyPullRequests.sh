@@ -32,9 +32,11 @@ SOURCE=($SOURC)
 
 for i in ${!PIPE[@]}
 do
+   
    echo ${PIPE[$i]} 
    #**************Añadir Template*******
    #aws codecommit associate-approval-rule-template-with-repository --repository-name ${SOURCE[$i]}  --approval-rule-template-name "Approval for master branches"
    #**************Enlistar Templates adjuntos*******
    aws codecommit list-associated-approval-rule-templates-for-repository --repository-name ${SOURCE[$i]}
+
 done

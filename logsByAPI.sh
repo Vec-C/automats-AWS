@@ -2,6 +2,8 @@
 
 # Begin script in case all parameters are correct
 
+#EJECUTAR PREVIAMENTE SCRIPT "getTasks.sh" teniendo en cuenta los servicios del API a verificar, posteriormente ejecutar "verifyAPIUsage.sh" y completar los "[" "]" del archivo Verifying.json
+
 #EJECUTAR DESDE TERMINAL******C/P*****NO SÉ, INVESTIGA****
 
 #****************LOOPING ON TARGETS*********************
@@ -17,11 +19,11 @@ for row in $(jq '.' Verifying.json | jq -r '.[] | @base64'); do
 
     echo $SERVICE
 
-    DEFINITION=$(ggrep -Po '(?<=")(.*?)'$SERVICE'(.*?)(?=")' Definitions.txt)
+    DEFINITION=$(ggrep -Po '(?<="'$SERVICE'\s)(.*?)(?=")' Definitions.txt)
 
-    jq '.taskDefinition | .containerDefinitions | .[] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION)
+    jq '.taskDefinition | .containerDefinitions | .[0] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION)
 
-    LOGGROUP=$(jq '.taskDefinition | .containerDefinitions | .[] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION) | tr '\n' ' ')
+    LOGGROUP=$(jq '.taskDefinition | .containerDefinitions | .[0] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION) | tr '\n' ' ')
 
     LOGGROUP=$(ggrep -Po '(?<=")/(.*?)(?=")' <<< $LOGGROUP )
 
@@ -43,6 +45,3 @@ for row in $(jq '.' Verifying.json | jq -r '.[] | @base64'); do
     echo '{"resource":"'$(_jq '.resource')'","service":"'$SERVICE'","count":"'$COUNT'"},' >> apiStatistics.json
 
 done
-
-
-

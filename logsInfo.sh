@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # Begin script in case all parameters are correct
+#[1] ->  veirifcar posicion dentro de la taskdefinition del logGroup al cual lanzar el query
 
 #****************LOGS***********
 echo "Ingrese nombre de servicio"
 read SERVICE
 
-DEFINITION=$(ggrep -Po '(?<=")(.*?)'$SERVICE'(.*?)(?=")' Definitions.txt)
+DEFINITION=$(ggrep -Po '(?<="'$SERVICE'\s)(.*?)(?=")' Definitions.txt)
 
-jq '.taskDefinition | .containerDefinitions | .[] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION)
+jq '.taskDefinition | .containerDefinitions | .[1] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION)
 
-LOGGROUP=$(jq '.taskDefinition | .containerDefinitions | .[] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION) | tr '\n' ' ')
+LOGGROUP=$(jq '.taskDefinition | .containerDefinitions | .[1] | .logConfiguration | .options | .[] ' <<< $(aws ecs describe-task-definition --task-definition $DEFINITION) | tr '\n' ' ')
 
 LOGGROUP=$(ggrep -Po '(?<=")/(.*?)(?=")' <<< $LOGGROUP )
 

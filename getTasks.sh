@@ -60,6 +60,6 @@ for file in servicesINFO*.json; do
    aws ecs describe-services --cli-input-json file://./${file} >> servicesDetail.json
 done
 
-jq '.services | .[] | .taskDefinition' servicesDetail.json > Definitions.txt
+jq '.services | .[] | "\(.serviceName) \(.taskDefinition)"' servicesDetail.json > Definitions.txt
 jq '.services | .[] | .serviceArn' servicesDetail.json > ServicesARNS.txt
 

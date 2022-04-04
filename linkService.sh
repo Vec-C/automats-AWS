@@ -5,20 +5,27 @@ helpFunction()
 {
    echo ""
    echo "Usage: $0 -swagger with file name -type with (HTTP|VPCLINK|MOCK)"
-   echo "\t-a Service definition not found"
    exit 1 # Exit script after printing help
 }
 
-while getopts ":swagger:type:" opt; do
+#while getopts "swagger:type:" opt; do
+#   case "$opt" in
+#      swagger ) SWAGGER=${OPTARG} ;;
+#      type ) TYPE=${OPTARG} ;;
+#      ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
+#   esac
+#done
+
+
+while getopts "a:" opt; do
    case "$opt" in
-      swagger ) SWAGGER="$OPTARG" ;;
-      type ) TYPE="$OPTARG" ;;
+      a ) SWAGGER="$OPTARG" ;;
       ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
 
 # Print helpFunction in case parameters are empty
-if [ -z "$SWAGGER" ] || [ -z "$TYPE" ]
+if [ -z "$SWAGGER" ] 
 then
    echo "Some or all of the parameters are empty";
    helpFunction
@@ -142,9 +149,9 @@ if [ $DOIT == "yes" ]
 			done
 
 			echo "Creating "${CREATEM[$i]}" method for /"${CREATER[$i]}
-			HPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="header" ) | .name ' $SWAGGER )
-			QPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="query" ) | .name ' $SWAGGER )
-			PPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.required == false) | select(.in=="path" ) | .name ' $SWAGGER )
+			HPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.in=="header" ) | .name ' $SWAGGER )
+			QPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]?  | select(.in=="query"  ) | .name ' $SWAGGER )
+			PPARAMS=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .parameters[]? | select(.in=="path"   ) | .name ' $SWAGGER )
 			CODERESPONSES=$( jq -r '.paths["/'${CREATER[$i]}'"] | .'${CREATEM[$i]}' | .responses | to_entries | .[] | .key' $SWAGGER )
 			RESOURCES=$(aws apigateway get-resources --rest-api-id $APIID)
 			echo $RESOURCES | jq '.items[] | "\(.id) \(.path) \(.resourceMethods)\n"' > linkrecs.txt
@@ -181,7 +188,7 @@ if [ $DOIT == "yes" ]
 				aws apigateway put-method --rest-api-id $APIID --resource-id $RID --http-method $METHOD --authorization-type "NONE" --no-api-key-required --request-parameters "${RPARAMETERS%?}"
 				case "$TYPE" in
 			      VPCLINK ) 
-						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}" --connection-type VPC_LINK --connection-id 8onbgr
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}" --connection-type VPC_LINK --connection-id qft5gu
 			       ;;
 			      HTTP ) 
 						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --request-parameters "${RIPARAMETERS%?}"
@@ -194,7 +201,7 @@ if [ $DOIT == "yes" ]
 				aws apigateway put-method --rest-api-id $APIID --resource-id $RID --http-method $METHOD --authorization-type "NONE" --no-api-key-required
 				case "$TYPE" in
 			      VPCLINK ) 
-						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --connection-type VPC_LINK --connection-id 8onbgr
+						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]} --connection-type VPC_LINK --connection-id qft5gu
 			       ;;
 			      HTTP ) 
 						aws apigateway put-integration --rest-api-id $APIID --resource-id $RID --http-method $METHOD --type HTTP --integration-http-method $METHOD --uri 'http://${stageVariables.'${SWAGGER%?????}'}/'${CREATER[$i]}
@@ -208,7 +215,7 @@ if [ $DOIT == "yes" ]
 			#***********ADDING RESPONSE CODES**********
 			while read p; do  
 				if [ ! -z $p ] ; then  
-  					aws apigateway put-method-response --rest-api-id $APIID --resource-id $RID --http-method $METHOD --status-code $p
+  					aws apigateway put-method-response --rest-api-id $APIID --resource-id $RID --http-method $METHOD --status-code $p --response-models '{"application/json":"Empty"}'
 					aws apigateway put-integration-response --rest-api-id $APIID --resource-id $RID --http-method $METHOD --status-code $p --selection-pattern $p
 				fi
 			done <<< $CODERESPONSES
